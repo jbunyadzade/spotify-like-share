@@ -1,0 +1,53 @@
+# General
+.DS_Store
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.env
+.env.local
+
+# FastAPI & Dependencies
+*.log
+*.db
+alembic/versions/*.pyc
+instance/
+*.sqlite3
+
+# PostgreSQL
+pgdata/
+postgres_data/
+*.sql
+
+# Node.js / React (Vite)
+node_modules/
+dist/
+.vite/
+
+# Build Artifacts
+*.tar.gz
+*.zip
+*.egg-info/
+build/
+coverage/
+htmlcov/
+
+# Docker
+*.dockerfile
+docker-entrypoint.sh
+supervisord.conf
+
+# VS Code / JetBrains / Editors
+.vscode/
+.idea/
+*.iml
+
+# Misc
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
