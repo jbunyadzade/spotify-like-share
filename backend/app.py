@@ -12,7 +12,7 @@ import datetime
 
 app = Flask(__name__, static_folder='frontend/dist', static_url_path='/')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv(
-    'DATABASE_URL', 'postgresql://user:password@localhost:5432/spotify_sync')
+    'DATABASE_URL', 'postgresql://user:password@db:5432/spotify_sync')
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 class User(db.Model):
