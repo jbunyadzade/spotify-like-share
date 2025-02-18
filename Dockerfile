@@ -20,7 +20,7 @@ ENV FLASK_RUN_PORT=5000
 
 # Expose the Flask port
 EXPOSE 5000
-
+RUN ["echo", "$DATABASE_URL"]
 # Start Flask
-# RUN ["flask", "db", "upgrade"]
+RUN ["flask", "db", "upgrade"]
 CMD ["python", "app.py"]
