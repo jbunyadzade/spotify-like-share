@@ -3,7 +3,7 @@ from flask_migrate import Migrate
 import os
 import jwt
 import datetime
-from flask import Flask, redirect, request, session, jsonify, url_for, make_response, render_template_string
+from flask import Flask, redirect, request, session, jsonify, url_for, make_response, send_from_directory
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from dotenv import load_dotenv
@@ -85,7 +85,7 @@ def callback():
 
     # Create a response that sets the JWT as an HTTP-only cookie and redirect to /home.
     response = make_response(redirect(url_for('home')))
-    response.set_cookie('jwt', jwt_token, httponly=True, samesite='Lax')
+    response.set_cookie('jwt', jwt_token, httponly=True, samesite='Lax', expires=3600)
     return response
 
 def get_spotify_client(token_info):
