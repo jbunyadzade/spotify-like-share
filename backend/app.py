@@ -47,14 +47,14 @@ def serve_react(path):
     return send_from_directory(app.static_folder, "index.html")
 
 
-@app.route('/api/login')
+@app.route('/api/login', methods=['POST'])
 def login():
     # Redirect user to Spotify's OAuth page
     auth_url = sp_oauth.get_authorize_url()
     return redirect(auth_url)
 
 
-@app.route('api/callback')
+@app.route('/api/callback', methods=['POST'])
 def callback():
     # Retrieve authorization code from callback URL
     code = request.args.get('code')
@@ -87,6 +87,110 @@ def callback():
     response = make_response(redirect(url_for('home')))
     response.set_cookie('jwt', jwt_token, httponly=True, samesite='Lax')
     return response
+
+def get_spotify_client(token_info):
+    """Helper to create a Spotipy client given token info."""
+    return spotipy.Spotify(auth=token_info['access_token'])
+
+
+def fetch_user_token_info(user_id):
+    """
+    This function should retrieve the stored token info for a given user.
+    For demonstration, we'll assume it's stored in the session.
+    In production, you would use a database to store and refresh tokens.
+    """
+    token_info = session.get('token_info')
+    if token_info and token_info.get('access_token'):
+        return token_info
+    return None
+
+
+@app.route('/api/sync', methods=['POST'])
+def sync():
+    # Retrieve the JWT from cookies
+    jwt_token = request.cookies.get('jwt')
+    if not jwt_token:
+        return jsonify({'error': 'JWT token not found in cookies'}), 401
+
+    try:
+        payload = jwt.decode(jwt_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_email = payload.get('email')
+        user_id = payload.get('spotify_id')
+    except jwt.ExpiredSignatureError:
+        return jsonify({'error': 'JWT token has expired'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'error': 'Invalid JWT token'}), 401
+
+    # Retrieve the user's token info (in production, retrieve from your database)
+    token_info = fetch_user_token_info(user_id)
+    if not token_info:
+        return jsonify({'error': 'User token info not found'}), 404
+
+    sp = get_spotify_client(token_info)
+
+    # Getting Liked songs
+
+    liked_tracks = set()
+    offset = 0
+    limit = 50  # Max per request
+
+    while True:
+        results = sp.current_user_saved_tracks(limit=limit, offset=offset)
+        items = results.get('items', [])
+
+        if not items:
+            break  # Stop when no more tracks
+
+        liked_tracks.update(item['track']['id'] for item in items if item.get('track'))
+        offset += limit
+
+
+    # Check if a playlist named "Public Likes" exists; if not, create it.
+    playlists = sp.current_user_playlists(limit=50)
+    public_playlist = None
+    for playlist in playlists.get('items', []):
+        if playlist.get('name') == 'Public Likes':
+            public_playlist = playlist
+            break
+
+    if not public_playlist:
+        public_playlist = sp.user_playlist_create(user=user_id, name='Public Likes', public=True)
+
+    playlist_id = public_playlist['id']
+
+
+    playlist_tracks = set()
+    offset = 0
+    limit = 100  # Max per request
+
+    while True:
+        results = sp.playlist_tracks(playlist_id, limit=limit, offset=offset)
+        items = results.get('items', [])
+
+        if not items:
+            break
+
+        playlist_tracks.update(item['track']['id'] for item in items if item.get('track'))
+        offset += limit
+
+
+    # Determine tracks to add and remove
+    to_add = liked_tracks - playlist_tracks
+    to_remove = playlist_tracks - liked_tracks
+
+    # Update playlist
+    if to_add:
+        sp.playlist_add_items(playlist_id, list(to_add))
+        print(f"Added {len(to_add)} tracks.")
+
+    if to_remove:
+        sp.playlist_remove_all_occurrences_of_items(playlist_id, list(to_remove))
+        print(f"Removed {len(to_remove)} tracks.")
+
+    if not to_add and not to_remove:
+        print("Playlist is already up to date.")
+
+    return jsonify({'message': 'Liked songs have been synced to "Public Likes".', 'playlist_id': playlist_id})
 
 
 if __name__ == '__main__':
