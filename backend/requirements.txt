@@ -2,3 +2,6 @@ flask
 spotipy
 python-dotenv
 pyjwt
+flask-sqlalchemy
+flask-migrate
+psycopg2-binary
