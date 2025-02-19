@@ -34,8 +34,8 @@ class User(db.Model):
     last_synced_at = Column(DateTime, default=None)
 
 
-SPOTIPY_CLIENT_ID = os.getenv("CLIENT_ID")
-SPOTIPY_CLIENT_SECRET = os.getenv("CLIENT_SECRET")
+SPOTIPY_CLIENT_ID = os.getenv("SPOTIPY_CLIENT_ID")
+SPOTIPY_CLIENT_SECRET = os.getenv("SPOTIPY_CLIENT_SECRET")
 SPOTIPY_REDIRECT_URI = 'http://127.0.0.1:5000/callback'
 SCOPE = 'user-library-read playlist-modify-public playlist-read-private'
 
