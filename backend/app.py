@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy.orm import mapped_column, Mapped
 from sqlalchemy.ext.declarative import declarative_base
 import datetime
 
@@ -32,6 +33,7 @@ class User(db.Model):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     # Last sync time (nullable)
     last_synced_at = Column(DateTime, default=None)
+    is_active: Mapped[bool] = mapped_column(default=False)
 
 
 SPOTIPY_CLIENT_ID = os.getenv("SPOTIPY_CLIENT_ID")
