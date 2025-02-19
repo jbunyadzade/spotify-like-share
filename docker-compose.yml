@@ -13,6 +13,8 @@ services:
         build: .
         environment:
             DATABASE_URL: postgresql://user:password@db:5432/spotify_sync
+            SPOTIPY_CLIENT_ID: ${SPOTIPY_CLIENT_ID}
+            SPOTIPY_CLIENT_SECRET: ${SPOTIPY_CLIENT_SECRET}
         ports:
             - "5000:5000"
         depends_on:
