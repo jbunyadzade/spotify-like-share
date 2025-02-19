@@ -20,6 +20,10 @@ ENV FLASK_RUN_PORT=5000
 
 # Expose the Flask port
 EXPOSE 5000
-# Start Flask
-# RUN ["flask", "db", "upgrade"]
-CMD ["flask", "db", "upgrade", "&&", "python", "app.py"]
+
+# Copy entrypoint script
+COPY backend/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Use the entrypoint script
+ENTRYPOINT ["/entrypoint.sh"]
