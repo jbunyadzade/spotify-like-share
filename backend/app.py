@@ -1,3 +1,6 @@
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import mapped_column, Mapped
+from sqlalchemy import Column, Integer, String, DateTime
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 import os
@@ -9,19 +12,14 @@ from spotipy.oauth2 import SpotifyOAuth
 from dotenv import load_dotenv
 load_dotenv()
 
-from sqlalchemy import Column, Integer, String, DateTime
-from sqlalchemy.orm import mapped_column, Mapped
-from sqlalchemy.ext.declarative import declarative_base
-import datetime
-
-
-
 
 app = Flask(__name__, static_folder='frontend/dist', static_url_path='/')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv(
     'DATABASE_URL', 'postgresql://user:password@db:5432/spotify_sync')
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
+
+
 class User(db.Model):
     __tablename__ = "users"
 
@@ -60,21 +58,58 @@ def hello():
     return {'message': 'Hello from Flask API!'}
 
 
-# Serve React frontend
-
-
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>')
-def serve_react(path):
-    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
-        return send_from_directory(app.static_folder, path)
-    return send_from_directory(app.static_folder, "index.html")
-
 @app.route('/api/login', methods=['POST'])
 def login():
     # Redirect user to Spotify's OAuth page
     auth_url = sp_oauth.get_authorize_url()
     return redirect(auth_url)
+
+
+@app.route('/api/add-spotify-user', methods=['POST'])
+def add_spotify_user():
+    data = request.get_json()
+    spotify_id = data.get('spotify_id')
+    access_token = data.get('access_token')
+    refresh_token = data.get('refresh_token')
+    token_expires_at = data.get('token_expires_at')
+    is_active = data.get('is_active', True)
+
+    if not all([spotify_id, access_token, refresh_token, token_expires_at]):
+        return jsonify({'error': 'Missing required fields'}), 400
+
+    user = User(
+        spotify_id=spotify_id,
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_expires_at=datetime.datetime.strptime(
+            token_expires_at, '%Y-%m-%d'),
+        is_active=is_active
+    )
+    db.session.add(user)
+    db.session.commit()
+    return jsonify({'message': 'User added successfully!'})
+
+
+@app.route('/api/get-spotify-user')
+def get_spotify_user():
+    spotify_id = request.args.get('spotify_id')
+    if not spotify_id:
+        return jsonify({'error': 'spotify_id query parameter is required'}), 400
+
+    user = User.query.filter_by(spotify_id=spotify_id).first()
+    if user:
+        return jsonify({'message': 'User found', 'user': {
+            'id': user.id,
+            'spotify_id': user.spotify_id,
+            'access_token': user.access_token,
+            'refresh_token': user.refresh_token,
+            'token_expires_at': user.token_expires_at,
+            'created_at': user.created_at,
+            'last_synced_at': user.last_synced_at,
+            'is_active': user.is_active
+        }})
+    else:
+        return jsonify({'message': 'User not found'}), 404
 
 
 @app.route('/api/callback', methods=['POST'])
@@ -108,8 +143,10 @@ def callback():
 
     # Create a response that sets the JWT as an HTTP-only cookie and redirect to /home.
     response = make_response(redirect(url_for('home')))
-    response.set_cookie('jwt', jwt_token, httponly=True, samesite='Lax', expires=3600)
+    response.set_cookie('jwt', jwt_token, httponly=True,
+                        samesite='Lax', expires=3600)
     return response
+
 
 def get_spotify_client(token_info):
     """Helper to create a Spotipy client given token info."""
@@ -164,9 +201,9 @@ def sync():
         if not items:
             break  # Stop when no more tracks
 
-        liked_tracks.update(item['track']['id'] for item in items if item.get('track'))
+        liked_tracks.update(item['track']['id']
+                            for item in items if item.get('track'))
         offset += limit
-
 
     # Check if a playlist named "Public Likes" exists; if not, create it.
     playlists = sp.current_user_playlists(limit=50)
@@ -177,10 +214,10 @@ def sync():
             break
 
     if not public_playlist:
-        public_playlist = sp.user_playlist_create(user=user_id, name='Public Likes', public=True)
+        public_playlist = sp.user_playlist_create(
+            user=user_id, name='Public Likes', public=True)
 
     playlist_id = public_playlist['id']
-
 
     playlist_tracks = set()
     offset = 0
@@ -193,9 +230,9 @@ def sync():
         if not items:
             break
 
-        playlist_tracks.update(item['track']['id'] for item in items if item.get('track'))
+        playlist_tracks.update(item['track']['id']
+                               for item in items if item.get('track'))
         offset += limit
-
 
     # Determine tracks to add and remove
     to_add = liked_tracks - playlist_tracks
@@ -207,13 +244,25 @@ def sync():
         print(f"Added {len(to_add)} tracks.")
 
     if to_remove:
-        sp.playlist_remove_all_occurrences_of_items(playlist_id, list(to_remove))
+        sp.playlist_remove_all_occurrences_of_items(
+            playlist_id, list(to_remove))
         print(f"Removed {len(to_remove)} tracks.")
 
     if not to_add and not to_remove:
         print("Playlist is already up to date.")
 
     return jsonify({'message': 'Liked songs have been synced to "Public Likes".', 'playlist_id': playlist_id})
+
+# Serve React frontend
+
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_react(path):
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+    return send_from_directory(app.static_folder, "index.html")
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
